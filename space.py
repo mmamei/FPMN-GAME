@@ -6,6 +6,7 @@ from pygame import font
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 ADDENEMY = pygame.USEREVENT + 1
+ADDBONUS = pygame.USEREVENT + 2
 
 class Player(pygame.sprite.Sprite):
     def __init__(self):
@@ -16,6 +17,7 @@ class Player(pygame.sprite.Sprite):
         self.rect.center = [10, SCREEN_HEIGHT/2]
         self.v = 1
         self.when_hit = -1
+        self.n_bonus = False
 
     def update(self, pressed_keys):
         if pressed_keys[K_UP]:
@@ -26,8 +28,6 @@ class Player(pygame.sprite.Sprite):
             self.rect.move_ip(-self.v, 0)
         if pressed_keys[K_RIGHT]:
             self.rect.move_ip(self.v, 0)
-
-
 
         # Keep player on the screen
         if self.rect.left < 0:
@@ -49,12 +49,20 @@ class Player(pygame.sprite.Sprite):
         m = Missile(self.rect.right + 5, self.rect.bottom)
         missiles.add(m)
         all_sprites.add(m)
+        if self. n_bonus:
+            m = Missile(self.rect.right + 5, self.rect.bottom + 5)
+            missiles.add(m)
+            all_sprites.add(m)
+
 
     def hit(self):
         self.surf = pygame.image.load('images/boom.png').convert()
         self.surf.set_colorkey((255, 255, 255), RLEACCEL)
         self.when_hit = pygame.time.get_ticks()
 
+    def bonus(self):
+        #print('bonus')
+        self.n_bonus = True
 
 class Missile(pygame.sprite.Sprite):
     def __init__(self,x,y):
@@ -69,16 +77,18 @@ class Missile(pygame.sprite.Sprite):
         if self.rect.left > SCREEN_WIDTH:
             self.kill()
 
-
-
 class Enemy(pygame.sprite.Sprite):
-    def __init__(self):
+    def __init__(self, big=False):
         super().__init__()
+        self.big = big
         self.surf = pygame.image.load('images/enemy.png').convert()
+        if self.big:
+            self.surf = pygame.transform.scale(self.surf, (79*2,28*2))
         self.surf.set_colorkey((255, 255, 255), RLEACCEL)
         self.rect = self.surf.get_rect(center=(820, random.randint(0, 600)))
         self.speed = random.randint(1, 2)
         self.when_hit = -1
+        self.n_hit = 0
 
     def update(self):
         self.rect.move_ip(-self.speed, 0)
@@ -90,9 +100,30 @@ class Enemy(pygame.sprite.Sprite):
             num_enemy_killed += 1
 
     def hit(self):
-        self.surf = pygame.image.load('images/boom.png').convert()
-        self.surf.set_colorkey((255, 255, 255), RLEACCEL)
-        self.when_hit = pygame.time.get_ticks()
+        self.n_hit += 1
+        if not self.big or self.n_hit > 2:
+            self.surf = pygame.image.load('images/boom.png').convert()
+            self.surf.set_colorkey((255, 255, 255), RLEACCEL)
+            self.when_hit = pygame.time.get_ticks()
+
+
+
+class Bonus(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.surf = pygame.Surface((75, 25))
+        self.surf.fill((255, 0, 0))
+        self.rect = self.surf.get_rect(center=(820, random.randint(0, 600)))
+        self.speed = random.randint(1, 2)
+
+
+    def update(self):
+        self.rect.move_ip(-self.speed, 0)
+        if self.rect.right < 0:
+            self.kill()
+
+    def hit(self):
+        self.kill()
 
 
 
@@ -109,12 +140,14 @@ gameon = False
 player = Player()
 missiles = pygame.sprite.Group()
 enemies = pygame.sprite.Group()
+bonuses = pygame.sprite.Group()
 all_sprites = pygame.sprite.Group()
 all_sprites.add(player)
 clock = pygame.time.Clock()
 
 
 pygame.time.set_timer(ADDENEMY, 250)
+pygame.time.set_timer(ADDBONUS, 1000)
 
 # Our main loop!
 while running:
@@ -133,9 +166,17 @@ while running:
         elif event.type == QUIT:
             running = False
         elif gameon and event.type == ADDENEMY:
-            new_enemy = Enemy()
+            big = False
+            if random.randint(1,100) > 80:
+                big = True
+            new_enemy = Enemy(big)
             enemies.add(new_enemy)
             all_sprites.add(new_enemy)
+        elif gameon and event.type == ADDBONUS:
+            new_bonus = Bonus()
+            bonuses.add(new_bonus)
+            all_sprites.add(new_bonus)
+
 
     if not gameon:
         num_enemy_killed = 0
@@ -156,8 +197,12 @@ while running:
             e.update()
         for m in missiles:
             m.update()
+        for b in bonuses:
+            b.update()
         if pygame.sprite.spritecollideany(player, enemies):
             player.hit()
+        if pygame.sprite.spritecollideany(player, bonuses):
+            player.bonus()
 
         collisions = pygame.sprite.groupcollide(missiles,enemies,True,False)
         for k,v in collisions.items():

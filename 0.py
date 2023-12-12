@@ -1,7 +1,5 @@
 import pygame
 from pygame.locals import *
-import random
-from pygame import font
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
