@@ -7,10 +7,19 @@ from pygame import font
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.surf = pygame.Surface((20,20))
-        self.surf.fill([255,255,255])
+        #self.surf = pygame.Surface((20,20))
+        #self.surf.fill([255,255,255])
+
+        self.surf0 = pygame.image.load('images/tank1.png').convert()
+        self.surf0.set_colorkey((255, 255, 255), RLEACCEL)
+        self.surf0 = pygame.transform.scale(self.surf0, (WALL_DX-10,WALL_DY-10))
+
+        self.surf = pygame.transform.rotate(self.surf0,90)
         self.rect = self.surf.get_rect()
-        self.rect.center = [10, WALL_DY + 12]
+        self.dx = 1
+        self.dy = 0
+
+        self.rect.center = [10, WALL_DY + WALL_DY/2]
         self.v = 1
 
     def update(self, pressed_keys):
@@ -20,13 +29,21 @@ class Player(pygame.sprite.Sprite):
 
         if pressed_keys[K_UP]:
             dy = -self.v
+            self.surf = pygame.transform.rotate(self.surf0, 180)
         if pressed_keys[K_DOWN]:
             dy = self.v
+            self.surf = pygame.transform.rotate(self.surf0, 0)
         if pressed_keys[K_LEFT]:
             dx = -self.v
+            self.surf = pygame.transform.rotate(self.surf0, 270)
         if pressed_keys[K_RIGHT]:
             dx = self.v
+            self.surf = pygame.transform.rotate(self.surf0, 90)
         self.rect.move_ip(dx,dy)
+
+        if dx != 0 or dy !=0:
+            self.dx = dx
+            self.dy = dy
 
         # Keep player on the screen
         if self.rect.left < 0:
@@ -41,16 +58,42 @@ class Player(pygame.sprite.Sprite):
         if pygame.sprite.spritecollideany(self,wall_sprites):
             self.rect.move_ip(-dx,-dy)
 
-        if self.rect.right > 910 and self.rect.top > 560:
+        if self.rect.right > SCREEN_WIDTH-2*WALL_DX and self.rect.top > SCREEN_HEIGHT-2*WALL_DY:
             global gameon
             gameon = False
             global maze
             maze = None
             self.kill()
 
-        print(self.rect.right,self.rect.top)
+        #print(self.rect.right,self.rect.top)
 
+    def fire(self):
+        x,y = self.rect.center
+        m = Missile(x,y, self.dx, self.dy)
+        missiles.add(m)
+        all_sprites.add(m)
 
+class Missile(pygame.sprite.Sprite):
+    def __init__(self,x,y,dx,dy):
+        super().__init__()
+        self.surf = pygame.image.load('images/missile.png').convert()
+        if dx == -1:
+            self.surf = pygame.transform.rotate(self.surf, 180)
+        elif dy == 1:
+            self.surf = pygame.transform.rotate(self.surf, 270)
+        elif dy == -1:
+            self.surf = pygame.transform.rotate(self.surf, 90)
+        self.surf.set_colorkey((255, 255, 255), RLEACCEL)
+        self.rect = self.surf.get_rect(center=(x,y))
+        self.dx = dx
+        self.dy = dy
+        self.speed = 5
+
+    def update(self):
+        print(self.speed,self.dx,self.dy)
+        self.rect.move_ip(self.speed*self.dx, self.speed*self.dy)
+        if pygame.sprite.spritecollideany(self, wall_sprites):
+            self.kill()
 
 
 
@@ -67,10 +110,12 @@ class Wall(pygame.sprite.Sprite):
 
 
 
-SCREEN_WIDTH = 930
-SCREEN_HEIGHT = 700
-WALL_DX = 30
-WALL_DY = 30
+
+WALL_DX = 36
+WALL_DY = 36
+
+SCREEN_WIDTH = WALL_DX*(10*3+1)
+SCREEN_HEIGHT = WALL_DY*(10*2+1)
 
 num_enemy_killed = 0
 
@@ -84,6 +129,9 @@ running = True
 gameon = False
 
 player = Player()
+missiles = pygame.sprite.Group()
+enemies = pygame.sprite.Group()
+all_sprites = pygame.sprite.Group()
 wall_sprites = pygame.sprite.Group()
 
 # Our main loop!
@@ -97,6 +145,8 @@ while running:
                 running = False
             if event.key == K_1:
                 gameon = True
+            if event.key == K_SPACE:
+                player.fire()
         # Check for QUIT event; if QUIT, set running to false
         elif event.type == QUIT:
             running = False
@@ -129,10 +179,15 @@ while running:
 
     if gameon:
         player.update(pygame.key.get_pressed())
+
+        for m in missiles:
+            m.update()
+
         screen.blit(player.surf,player.rect)
         for s in wall_sprites:
             screen.blit(s.surf, s.rect)
-
+        for m in missiles:
+            screen.blit(m.surf, m.rect)
         #surf = pygame.Surface((20, 20))
         #surf.fill([0, 255, 0])
         #rect = surf.get_rect()
